@@ -1688,33 +1688,8 @@ def webhook():
 # ===============================
 
 def run_flask():
-    """Sobe o Flask com WSGI server"""
-    import gunicorn.app.base
-    import os
-    
-    class StandaloneApplication(gunicorn.app.base.BaseApplication):
-        def __init__(self, app, options=None):
-            self.options = options or {}
-            self.application = app
-            super().__init__()
-        
-        def load_config(self):
-            for key, value in self.options.items():
-                if key in self.cfg.settings and value is not None:
-                    self.cfg.set(key.lower(), value)
-        
-        def load(self):
-            return self.application
-    
-    options = {
-        'bind': '0.0.0.0:5000',
-        'workers': 1,
-        'timeout': 120,
-        'accesslog': '-',
-        'errorlog': '-',
-        'loglevel': 'warning'
-    }
-    StandaloneApplication(app, options).run()
+    """Sobe o Flask simples para receber webhooks do Mercado Pago"""
+    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
 
 def start_bot_with_auto_restart():
     """Inicia o bot com reconexão automática se cair"""
@@ -1727,7 +1702,7 @@ def start_bot_with_auto_restart():
             time.sleep(5)
 
 if __name__ == "__main__":
-    # Inicia Flask em uma thread separada com Gunicorn
+    # Inicia Flask em uma thread separada
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     
