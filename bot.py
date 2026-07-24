@@ -13,6 +13,27 @@ from datetime import datetime
 from io import BytesIO
 import pyotp
 
+# ===============================
+# SISTEMA DE KEEPALIVE / PING
+# ===============================
+import requests
+
+PING_INTERVAL = 60  # segundos entre pings
+PING_URL = os.environ.get("PING_URL", WEBHOOK_URL)
+
+def run_ping_loop():
+    """Envia ping periódico para manter o Render acordado"""
+    while True:
+        try:
+            requests.get(PING_URL, timeout=10)
+            print(f"🟢 Keepalive enviado - {datetime.now().strftime('%H:%M:%S')}")
+        except Exception as e:
+            print(f"⚠️ Keepalive falhou: {e}")
+        time.sleep(PING_INTERVAL)
+
+ping_thread = threading.Thread(target=run_ping_loop, daemon=True)
+ping_thread.start()
+
 print("🔧 Iniciando bot...")
 
 # ===============================
@@ -22,7 +43,7 @@ DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN", "")
 MP_ACCESS_TOKEN = os.environ.get("MP_ACCESS_TOKEN", "")
 WEBHOOK_URL = os.environ.get(
     "WEBHOOK_URL",
-    "https://bot-discord-loja-eg7u.onrender.com/webhook"
+    "https://bot-discord-g7.onrender.com/webhook"
 )
 
 ARQUIVO_PRODUTO = "produto.txt"
@@ -331,13 +352,30 @@ class Bot(discord.Client):
     def __init__(self):
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
+        self.last_ready_time = 0
+        self.reconnect_count = 0
 
     async def setup_hook(self):
         await self.tree.sync()
         print("✅ Slash commands sincronizados")
 
     async def on_ready(self):
-        print(f"🟢 Logado como {self.user}")
+        self.last_ready_time = time.time()
+        print(f"🟢 Logado como {self.user} | Reconeções: {self.reconnect_count}")
+        # Ativar presença
+        await self.change_presence(
+            activity=discord.Activity(
+                type=discord.ActivityType.watching,
+                name="G7 Store"
+            )
+        )
+
+    async def on_disconnect(self):
+        self.reconnect_count += 1
+        print(f"🔴 DESCONECTADO! Reconeção: {self.reconnect_count} | {datetime.now().strftime('%H:%M:%S')}")
+
+    async def on_resumed(self):
+        print(f"🟡 Reconectado! Reconeções totais: {self.reconnect_count}")
 
 bot = Bot()
 
@@ -1650,12 +1688,48 @@ def webhook():
 # ===============================
 
 def run_flask():
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    """Sobe o Flask com WSGI server"""
+    import gunicorn.app.base
+    import os
+    
+    class StandaloneApplication(gunicorn.app.base.BaseApplication):
+        def __init__(self, app, options=None):
+            self.options = options or {}
+            self.application = app
+            super().__init__()
+        
+        def load_config(self):
+            for key, value in self.options.items():
+                if key in self.cfg.settings and value is not None:
+                    self.cfg.set(key.lower(), value)
+        
+        def load(self):
+            return self.application
+    
+    options = {
+        'bind': '0.0.0.0:5000',
+        'workers': 1,
+        'timeout': 120,
+        'accesslog': '-',
+        'errorlog': '-',
+        'loglevel': 'warning'
+    }
+    StandaloneApplication(app, options).run()
+
+def start_bot_with_auto_restart():
+    """Inicia o bot com reconexão automática se cair"""
+    while True:
+        try:
+            bot.run(DISCORD_TOKEN)
+        except Exception as e:
+            print(f"❌ Bot caiu com erro: {e}")
+            print("🔄 Tentando reconectar em 5 segundos...")
+            time.sleep(5)
 
 if __name__ == "__main__":
-    # Inicia Flask em uma thread separada
+    # Inicia Flask em uma thread separada com Gunicorn
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     
-    # Inicia o bot Discord
-    bot.run(DISCORD_TOKEN)
+    # Inicia o bot Discord com reconexão automática
+    start_bot_with_auto_restart()
