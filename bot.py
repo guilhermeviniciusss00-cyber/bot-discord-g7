@@ -14,6 +14,18 @@ from io import BytesIO
 import pyotp
 
 # ===============================
+# CONFIG
+# ===============================
+DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN", "")
+MP_ACCESS_TOKEN = os.environ.get("MP_ACCESS_TOKEN", "")
+WEBHOOK_URL = os.environ.get(
+    "WEBHOOK_URL",
+    "https://bot-discord-g7.onrender.com/webhook"
+)
+
+print("🔧 Iniciando bot...")
+
+# ===============================
 # SISTEMA DE KEEPALIVE / PING
 # ===============================
 import requests
@@ -33,18 +45,6 @@ def run_ping_loop():
 
 ping_thread = threading.Thread(target=run_ping_loop, daemon=True)
 ping_thread.start()
-
-print("🔧 Iniciando bot...")
-
-# ===============================
-# CONFIG
-# ===============================
-DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN", "")
-MP_ACCESS_TOKEN = os.environ.get("MP_ACCESS_TOKEN", "")
-WEBHOOK_URL = os.environ.get(
-    "WEBHOOK_URL",
-    "https://bot-discord-g7.onrender.com/webhook"
-)
 
 ARQUIVO_PRODUTO = "produto.txt"
 ARQUIVO_PRODUTOS_JSON = "produtos.json"
