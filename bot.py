@@ -901,71 +901,75 @@ async def listar_produtos(interaction: discord.Interaction):
 # ===============================
 
 async def criar_embed_produto_tzada(produto_id: str, produto_info: dict):
-    """Cria um único embed estilo Tzada Store com imagem no topo e texto embaixo"""
+    """Cria um único embed estilo Premium para a G7 Store"""
     try:
         imagem_url = produto_info.get('imagem', '')
         qtd_variacoes = len(produto_info.get("variacoes", []))
         qtd_estoque = verificar_estoque(produto_id)
-        tipo_entrega = "🤖 Entrega Automática!" if produto_info.get('tipo') == 'auto' else "👨‍💼 Entrega Manual"
         
-        # Construir descrição com benefícios (estilo Tzada)
-        descricao = produto_info.get('descricao', 'Sem descrição')
+        # Cores e Ícones
+        cor_embed = 0x2b2d31 # Cinza escuro elegante
+        icone_entrega = "⚡" if produto_info.get('tipo') == 'auto' else "👤"
+        texto_entrega = "Entrega Automática" if produto_info.get('tipo') == 'auto' else "Entrega Manual"
         
-        # Se houver benefícios (separados por |), formatá-los com checkmarks
-        if '|' in descricao:
-            beneficios = [b.strip() for b in descricao.split('|')]
-            descricao_formatada = "\n".join([f"✅ {b}" for b in beneficios if b])
+        # Construir descrição
+        descricao_original = produto_info.get('descricao', 'Sem descrição')
+        if '|' in descricao_original:
+            beneficios = [b.strip() for b in descricao_original.split('|')]
+            descricao_formatada = "\n".join([f"✨ {b}" for b in beneficios if b])
         else:
-            descricao_formatada = f"✅ {descricao}"
+            descricao_formatada = f"✨ {descricao_original}"
         
-        # Adicionar informações de estoque
-        estoque_info = ""
-        if produto_info.get('tipo') == 'auto':
-            estoque_info = f"\n📦 Estoque: {qtd_estoque} unidades"
-        
-        # ✅ CRIAR UM Único EMBED COM IMAGEM NO TOPO
         embed = discord.Embed(
-            color=0xffa500  # Laranja vibrante como Tzada
+            title=f"{produto_info['nome']}",
+            description=f"```\n{descricao_formatada}\n```",
+            color=cor_embed,
+            timestamp=datetime.now()
         )
         
-        # ✅ ADICIONAR IMAGEM COMO THUMBNAIL (PEQUENA NO CANTO)
-        # Depois vamos usar set_image para forçar no topo
-        if imagem_url and imagem_url != "":
-            # Usar set_image para forçar a imagem no topo
-            embed.set_image(url=imagem_url)
-        
-        # ✅ ADICIONAR TÍTULO E DESCRIÇÃO
-        embed.title = f"⚡ {tipo_entrega}"
-        embed.description = f"**{produto_info['nome']}**\n\n{descricao_formatada}{estoque_info}"
-        
-        # Campos de Valor e Estoque lado a lado
+        # Status de Entrega no topo
         embed.add_field(
-            name="💰 Valor à vista",
-            value=f"R$ {produto_info['preco']:.2f}",
+            name="🚀 Método de Envio",
+            value=f"**{icone_entrega} {texto_entrega}**",
+            inline=False
+        )
+        
+        # Informações principais em blocos de código para visual profissional
+        embed.add_field(
+            name="💰 Preço Unitário",
+            value=f"```\nR$ {produto_info['preco']:.2f}\n```",
             inline=True
         )
         
         if produto_info.get('tipo') == 'auto':
+            status_estoque = "DISPONÍVEL" if qtd_estoque > 0 else "ESGOTADO"
             embed.add_field(
-                name="📦 Restam",
-                value=f"{qtd_estoque}",
+                name="📦 Estoque Atual",
+                value=f"```\n{qtd_estoque} unidades ({status_estoque})\n```",
                 inline=True
             )
         
-        # Adicionar variações se houver
+        # Variações se houver
         if qtd_variacoes > 0:
             embed.add_field(
-                name="🎮 Opções Disponíveis",
-                value=f"{qtd_variacoes} variações",
+                name="🎮 Opções",
+                value=f"```\n{qtd_variacoes} variações disponíveis\n```",
                 inline=True
             )
         
-        embed.set_footer(text="G7 STORE - Clique no botão abaixo para comprar!")
-        embed.timestamp = datetime.now()
+        # Imagem principal (Banner)
+        if imagem_url:
+            embed.set_image(url=imagem_url)
         
-        return embed  # Retorna um único embed
+        # Rodapé com branding e timestamp
+        embed.set_footer(
+            text="G7 Store • Selecione abaixo para comprar", 
+            icon_url=bot.user.display_avatar.url
+        )
+        
+        return embed
     except Exception as e:
-        print(f"❌ Erro ao criar embed Tzada: {e}")
+        print(f"❌ Erro ao criar embed premium: {e}")
         return None
 
 class ProdutoCompraView(discord.ui.View):
