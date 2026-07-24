@@ -1701,10 +1701,16 @@ def start_bot_with_auto_restart():
             print("🔄 Tentando reconectar em 5 segundos...")
             time.sleep(5)
 
-if __name__ == "__main__":
-    # Inicia Flask em uma thread separada
+def iniciar_servico():
+    """Função principal: sobe Flask + bot Discord"""
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
-    
-    # Inicia o bot Discord com reconexão automática
     start_bot_with_auto_restart()
+
+# Roda automaticamente tanto por import quanto direto
+if __name__ == "__main__":
+    iniciar_servico()
+else:
+    # Quando importado (ex: render_start.py), inicia via thread
+    t = threading.Thread(target=iniciar_servico, daemon=True)
+    t.start()
