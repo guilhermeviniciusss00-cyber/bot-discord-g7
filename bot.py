@@ -943,6 +943,11 @@ async def criar_embed_produto_tzada(produto_id: str, produto_info: dict):
         # Separador visual
         descricao_formatada += "─────────────────────────────────\n"
         
+        # Lógica de estoque
+        qtd_estoque = verificar_estoque(produto_id)
+        if produto_info.get('tipo') == 'auto':
+            descricao_formatada += f"Estoque: **{qtd_estoque} unidades**\n"
+        
         # Lógica de preço
         if qtd_variacoes > 0:
             precos = [v.get('preco', 0) for v in produto_info.get('variacoes', [])]
@@ -955,7 +960,7 @@ async def criar_embed_produto_tzada(produto_id: str, produto_info: dict):
         else:
             texto_preco = f"Preço: **R$ {produto_info['preco']:.2f}**"
             
-        descricao_formatada += f"{texto_preco}\nClique no botão **\"Comprar\"**"
+        descricao_formatada += f"{texto_preco}\n\nClique no botão **\"Comprar\"**"
 
         embed = discord.Embed(
             color=cor_embed
