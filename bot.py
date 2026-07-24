@@ -351,24 +351,40 @@ async def log_venda_publica(user, produto_nome, valor):
         if not canal:
             return
         
+        # Cor verde vibrante para sucesso/venda
         embed = discord.Embed(
-            color=0x2b2d31,
+            title="✅ COMPRA CONFIRMADA!",
+            description=f"O cliente {user.mention} acaba de adquirir um produto na nossa loja!",
+            color=0x2f3136, # Cor escura elegante (similar ao Discord Dark)
             timestamp=datetime.now()
         )
         
-        # Header com autor (Avatar e Nome)
-        embed.set_author(name=user.name, icon_url=user.display_avatar.url)
+        # Layout mais limpo e profissional
+        embed.add_field(
+            name="📦 Produto",
+            value=f"```\n{produto_nome}\n```",
+            inline=True
+        )
         
-        # Conteúdo principal
-        embed.title = "✅ Compra Realizada"
+        embed.add_field(
+            name="💰 Valor Pago",
+            value=f"```\nR$ {valor:.2f}\n```",
+            inline=True
+        )
         
-        # Carrinho
-        embed.add_field(name="Carrinho", value=f"1x {produto_nome}", inline=False)
+        # Adiciona uma imagem/thumbnail se o bot tiver uma logo, ou o avatar do user
+        embed.set_thumbnail(url=user.display_avatar.url)
         
-        # Valor pago
-        embed.add_field(name="Valor pago", value=f"**R$ {valor:.2f}**", inline=False)
+        # Rodapé com branding
+        embed.set_footer(
+            text="G7 Store • Pagamento Automático", 
+            icon_url=bot.user.display_avatar.url
+        )
         
-        await canal.send(embed=embed)
+        # Mensagem fora do embed para dar destaque
+        content = f"🚀 **Mais um cliente satisfeito na G7 Store!**"
+        
+        await canal.send(content=content, embed=embed)
     except Exception as e:
         print(f"❌ Erro log venda pública: {e}")
 
