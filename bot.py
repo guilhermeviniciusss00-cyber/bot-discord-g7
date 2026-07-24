@@ -929,8 +929,7 @@ async def criar_embed_produto_tzada(produto_id: str, produto_info: dict):
                 else:
                     descricao_formatada += f"{secao.strip()}\n\n"
         elif '|' in descricao_original:
-            # Fallback para o formato antigo, mas usando o estilo novo
-            descricao_formatada += "**Recursos**\n\n"
+            # Removido o título "Recursos" conforme solicitado
             beneficios = [b.strip() for b in descricao_original.split('|') if b.strip()]
             for b in beneficios:
                 descricao_formatada += f"• {b}\n"
@@ -959,14 +958,16 @@ async def criar_embed_produto_tzada(produto_id: str, produto_info: dict):
         descricao_formatada += f"{texto_preco}\nClique no botão **\"Comprar\"**"
 
         embed = discord.Embed(
-            title=f"{produto_info['nome']}",
-            description=descricao_formatada,
             color=cor_embed
         )
         
-        # Imagem principal (Banner) no topo
+        # Se houver imagem, ela será o destaque principal
         if imagem_url:
             embed.set_image(url=imagem_url)
+            
+        # O título do produto vem logo abaixo da imagem (no topo do conteúdo de texto)
+        embed.title = f"{produto_info['nome']}"
+        embed.description = descricao_formatada
         
         return embed
     except Exception as e:
