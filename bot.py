@@ -62,6 +62,7 @@ CARGO_CLIENTE = 1472666841515032676
 
 CANAL_CARRINHOS = 1529665643975147530
 CANAL_PAGOS = 1529665749923266601
+CANAL_PUBLICO = 1529978222715080875
 
 MEU_ID = 1468525203276435611
 CARGO_ADMIN = 1472666559049633952
@@ -309,6 +310,9 @@ async def log_pagamento_confirmado(user, produto_nome, valor, pagamento_id, item
         
         await canal_pagos.send(embed=embed)
         
+        # ✅ NOVO: Notificação pública
+        await log_venda_publica(user, produto_nome, valor)
+        
         # ✅ ATUALIZAR O CARRINHO: Editar a mensagem do carrinho ativo para mostrar aprovação
         if str(pagamento_id) in carrinhos_ativos:
             dados = carrinhos_ativos[str(pagamento_id)]
@@ -340,6 +344,33 @@ async def log_pagamento_confirmado(user, produto_nome, valor, pagamento_id, item
             del carrinhos_ativos[str(pagamento_id)]
     except Exception as e:
         print(f"❌ Erro log pagos: {e}")
+
+async def log_venda_publica(user, produto_nome, valor):
+    try:
+        canal = bot.get_channel(CANAL_PUBLICO)
+        if not canal:
+            return
+        
+        embed = discord.Embed(
+            color=0x2b2d31,
+            timestamp=datetime.now()
+        )
+        
+        # Header com autor (Avatar e Nome)
+        embed.set_author(name=user.name, icon_url=user.display_avatar.url)
+        
+        # Conteúdo principal
+        embed.title = "✅ Compra Realizada"
+        
+        # Carrinho
+        embed.add_field(name="Carrinho", value=f"1x {produto_nome}", inline=False)
+        
+        # Valor pago
+        embed.add_field(name="Valor pago", value=f"**R$ {valor:.2f}**", inline=False)
+        
+        await canal.send(embed=embed)
+    except Exception as e:
+        print(f"❌ Erro log venda pública: {e}")
 
 # ===============================
 # DISCORD
