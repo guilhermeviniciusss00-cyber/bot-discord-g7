@@ -901,71 +901,72 @@ async def listar_produtos(interaction: discord.Interaction):
 # ===============================
 
 async def criar_embed_produto_tzada(produto_id: str, produto_info: dict):
-    """Cria um único embed estilo Premium para a G7 Store"""
+    """Cria um único embed com design minimalista e profissional inspirado na imagem de referência"""
     try:
         imagem_url = produto_info.get('imagem', '')
         qtd_variacoes = len(produto_info.get("variacoes", []))
-        qtd_estoque = verificar_estoque(produto_id)
         
-        # Cores e Ícones
-        cor_embed = 0x2b2d31 # Cinza escuro elegante
-        icone_entrega = "⚡" if produto_info.get('tipo') == 'auto' else "👤"
-        texto_entrega = "Entrega Automática" if produto_info.get('tipo') == 'auto' else "Entrega Manual"
+        cor_embed = 0x2b2d31 # Cor de fundo que se mistura com o Discord
         
-        # Construir descrição
+        # Formatar a descrição
         descricao_original = produto_info.get('descricao', 'Sem descrição')
-        if '|' in descricao_original:
-            beneficios = [b.strip() for b in descricao_original.split('|')]
-            descricao_formatada = "\n".join([f"✨ {b}" for b in beneficios if b])
-        else:
-            descricao_formatada = f"✨ {descricao_original}"
         
+        # Lógica para criar as seções (Recursos, Compatibilidade, Informações)
+        # Se a descrição tiver o formato "Recursos: item1 | item2 // Compatibilidade: item1 | item2"
+        # vamos tentar processar, senão fazemos um fallback elegante.
+        descricao_formatada = ""
+        
+        if '//' in descricao_original:
+            secoes = descricao_original.split('//')
+            for secao in secoes:
+                if ':' in secao:
+                    titulo, itens_str = secao.split(':', 1)
+                    descricao_formatada += f"**{titulo.strip()}**\n\n"
+                    itens = [i.strip() for i in itens_str.split('|') if i.strip()]
+                    for item in itens:
+                        descricao_formatada += f"• {item}\n"
+                    descricao_formatada += "\n"
+                else:
+                    descricao_formatada += f"{secao.strip()}\n\n"
+        elif '|' in descricao_original:
+            # Fallback para o formato antigo, mas usando o estilo novo
+            descricao_formatada += "**Recursos**\n\n"
+            beneficios = [b.strip() for b in descricao_original.split('|') if b.strip()]
+            for b in beneficios:
+                descricao_formatada += f"• {b}\n"
+            descricao_formatada += "\n"
+        else:
+            descricao_formatada += f"{descricao_original}\n\n"
+            
+        # Adicionar o aviso de ticket no final da descrição
+        descricao_formatada += "🚨 Em caso de dúvidas, abra um ticket para atendimento.\n"
+        
+        # Separador visual
+        descricao_formatada += "─────────────────────────────────\n"
+        
+        # Lógica de preço
+        if qtd_variacoes > 0:
+            precos = [v.get('preco', 0) for v in produto_info.get('variacoes', [])]
+            preco_min = min(precos) if precos else produto_info['preco']
+            preco_max = max(precos) if precos else produto_info['preco']
+            if preco_min != preco_max:
+                texto_preco = f"Preço: **De R$ {preco_min:.2f} a R$ {preco_max:.2f}**"
+            else:
+                texto_preco = f"Preço: **R$ {preco_min:.2f}**"
+        else:
+            texto_preco = f"Preço: **R$ {produto_info['preco']:.2f}**"
+            
+        descricao_formatada += f"{texto_preco}\nClique no botão **\"Comprar\"**"
+
         embed = discord.Embed(
             title=f"{produto_info['nome']}",
-            description=f"```\n{descricao_formatada}\n```",
-            color=cor_embed,
-            timestamp=datetime.now()
+            description=descricao_formatada,
+            color=cor_embed
         )
         
-        # Status de Entrega no topo
-        embed.add_field(
-            name="🚀 Método de Envio",
-            value=f"**{icone_entrega} {texto_entrega}**",
-            inline=False
-        )
-        
-        # Informações principais em blocos de código para visual profissional
-        embed.add_field(
-            name="💰 Preço Unitário",
-            value=f"```\nR$ {produto_info['preco']:.2f}\n```",
-            inline=True
-        )
-        
-        if produto_info.get('tipo') == 'auto':
-            status_estoque = "DISPONÍVEL" if qtd_estoque > 0 else "ESGOTADO"
-            embed.add_field(
-                name="📦 Estoque Atual",
-                value=f"```\n{qtd_estoque} unidades ({status_estoque})\n```",
-                inline=True
-            )
-        
-        # Variações se houver
-        if qtd_variacoes > 0:
-            embed.add_field(
-                name="🎮 Opções",
-                value=f"```\n{qtd_variacoes} variações disponíveis\n```",
-                inline=True
-            )
-        
-        # Imagem principal (Banner)
+        # Imagem principal (Banner) no topo
         if imagem_url:
             embed.set_image(url=imagem_url)
-        
-        # Rodapé com branding e timestamp
-        embed.set_footer(
-            text="G7 Store • Selecione abaixo para comprar", 
-            icon_url=bot.user.display_avatar.url
-        )
         
         return embed
     except Exception as e:
@@ -979,7 +980,7 @@ class ProdutoCompraView(discord.ui.View):
         self.produto_nome = produto_nome
         self.variacoes = variacoes or []
     
-    @discord.ui.button(label="🛒 Comprar", style=discord.ButtonStyle.success, custom_id="btn_comprar")
+    @discord.ui.button(label="🛒 Comprar", style=discord.ButtonStyle.danger, custom_id="btn_comprar")
     async def comprar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         
