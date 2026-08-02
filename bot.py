@@ -1792,13 +1792,16 @@ def start_bot_with_auto_restart():
 
 def iniciar_servico():
     """Função principal: sobe Flask + bot Discord"""
-    print("🚀 Iniciando threads de serviço...")
+    print("🚀 Iniciando G7 Store Bot...")
     
-    # Inicia o Flask em uma thread separada
+    # 1. Inicia o Flask em uma thread separada
+    # Usamos daemon=True para que a thread morra se o processo principal morrer
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
+    print("📡 Servidor Web (Flask) iniciado em segundo plano.")
     
-    # Inicia o bot do Discord no loop principal (bloqueante)
+    # 2. Inicia o bot do Discord no loop principal (bloqueante)
+    # Isso mantém o processo do Render vivo
     start_bot_with_auto_restart()
 
 if __name__ == "__main__":
