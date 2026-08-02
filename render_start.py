@@ -17,19 +17,26 @@ def health_check():
     except:
         return False
 
+import subprocess
+
 def main():
     print("🟢 RenderStart inicializando...")
-    print("🔄 Importando bot.py (Flask + Discord bot)...")
     
-    # Importa o bot (que inicia Flask + Discord em threads)
-    import bot
+    # Inicia o bot.py como um processo filho
+    # Isso evita problemas de import circular e garante que o bot rode de forma independente
+    process = subprocess.Popen([sys.executable, "bot.py"])
     
-    print("🟢 Bot e Flask iniciados. Processo principal ativo.")
+    print(f"🟢 Bot iniciado com PID: {process.pid}")
     
-    # Loop principal: mantém o processo vivo
+    # Loop principal: mantém o processo vivo e monitora o bot
     while True:
-        time.sleep(3600)  # Dorme por 1 hora
-        print(f"✅ Heartbeat - {time.strftime('%H:%M:%S')}")
+        time.sleep(60)
+        if process.poll() is not None:
+            print("⚠️ Bot parou de rodar! Reiniciando...")
+            process = subprocess.Popen([sys.executable, "bot.py"])
+        
+        # O Render mantém o serviço vivo enquanto o processo principal estiver rodando
+        # e respondendo a requisições HTTP (que o bot.py faz via Flask)
 
 if __name__ == "__main__":
     main()
