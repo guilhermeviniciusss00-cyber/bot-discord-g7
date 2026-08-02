@@ -18,10 +18,7 @@ import pyotp
 # ===============================
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN", "")
 MP_ACCESS_TOKEN = os.environ.get("MP_ACCESS_TOKEN", "")
-WEBHOOK_URL = os.environ.get(
-    "WEBHOOK_URL",
-    "https://bot-discord-g7.onrender.com/webhook"
-)
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
 
 print("🔧 Iniciando bot...")
 
@@ -32,6 +29,10 @@ import requests
 
 PING_INTERVAL = 60  # segundos entre pings
 PING_URL = os.environ.get("PING_URL", WEBHOOK_URL)
+
+if not WEBHOOK_URL:
+    print("⚠️ AVISO: WEBHOOK_URL não configurada. O bot pode não receber notificações de pagamento.")
+
 
 def run_ping_loop():
     """Envia ping periódico para manter o Render acordado"""
