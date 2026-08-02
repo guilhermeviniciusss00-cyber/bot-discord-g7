@@ -26,15 +26,10 @@ def main():
     
     print("🟢 Bot e Flask iniciados. Processo principal ativo.")
     
-    # Loop principal: mantém o processo vivo e faz health check
+    # Loop principal: mantém o processo vivo
     while True:
-        time.sleep(300)  # Verifica a cada 5 minutos
-        
-        if not health_check():
-            print("⚠️ Flask não está respondendo! Forçando restart do serviço...")
-            os._exit(1)  # Exit code 1 faz o Render reiniciar automaticamente
-        
-        print(f"✅ Health check OK - {time.strftime('%H:%M:%S')}")
+        time.sleep(3600)  # Dorme por 1 hora
+        print(f"✅ Heartbeat - {time.strftime('%H:%M:%S')}")
 
 if __name__ == "__main__":
     main()

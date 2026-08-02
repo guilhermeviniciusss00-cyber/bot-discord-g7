@@ -1791,15 +1791,17 @@ def start_bot_with_auto_restart():
             time.sleep(10)
 
 def iniciar_servico():
-    """Função principal: sobe Flask + bot Discord"""
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
+    """Função principal: sobe o bot Discord (Flask é gerido pelo Gunicorn)"""
     start_bot_with_auto_restart()
 
 # Roda automaticamente tanto por import quanto direto
 if __name__ == "__main__":
+    # Se rodar direto, ainda sobe o Flask em thread para compatibilidade
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
     iniciar_servico()
 else:
-    # Quando importado (ex: render_start.py), inicia via thread
+    # Quando importado, apenas inicia o bot em thread
+    # O Flask (app) será pego pelo Gunicorn
     t = threading.Thread(target=iniciar_servico, daemon=True)
     t.start()
