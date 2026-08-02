@@ -11,7 +11,8 @@ import requests
 def health_check():
     """Verifica se o servidor Flask ainda está respondendo"""
     try:
-        r = requests.get("http://localhost:5000/", timeout=5)
+        port = int(os.environ.get("PORT", 5000))
+        r = requests.get(f"http://localhost:{port}/", timeout=5)
         return r.status_code == 200
     except:
         return False

@@ -1566,7 +1566,8 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "🤖 G7 STORE - Bot está online e funcionando!", 200
+    status_discord = "Conectado" if bot.is_ready() else "Desconectado"
+    return f"🤖 G7 STORE - Bot está online! <br> Status Discord: {status_discord}", 200
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -1582,6 +1583,8 @@ def webhook():
         data = request.form.to_dict()
     
     print(f"📩 Dados recebidos: {json.dumps(data, indent=2)}")
+    print(f"🔗 URL completa chamada: {request.url}")
+    print(f"👤 User Agent: {request.headers.get('User-Agent')}")
     
     # O Mercado Pago envia o ID de formas diferentes dependendo do tipo de evento
     payment_id = None
@@ -1748,7 +1751,9 @@ def webhook():
 
 def run_flask():
     """Sobe o Flask simples para receber webhooks do Mercado Pago"""
-    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+    port = int(os.environ.get("PORT", 5000))
+    print(f"📡 Flask iniciando na porta {port}...")
+    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
 
 def start_bot_with_auto_restart():
     """Inicia o bot com reconexão automática se cair"""
