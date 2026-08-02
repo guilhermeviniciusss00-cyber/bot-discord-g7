@@ -36,13 +36,26 @@ if not WEBHOOK_URL:
 
 def run_ping_loop():
     """Envia ping periódico para manter o Render acordado"""
+    # Aguarda o servidor subir
+    time.sleep(20)
     while True:
         try:
-            requests.get(PING_URL, timeout=10)
-            print(f"🟢 Keepalive enviado - {datetime.now().strftime('%H:%M:%S')}")
+            # Tenta pingar a URL configurada
+            if PING_URL:
+                requests.get(PING_URL, timeout=10)
+            
+            # Se a PING_URL for a webhook, tenta pingar a home também se possível
+            # Isso garante que o Render veja atividade no serviço HTTP
+            base_url = PING_URL.replace("/webhook", "") if PING_URL else None
+            if base_url and base_url != PING_URL:
+                requests.get(base_url, timeout=10)
+                
+            print(f"🟢 Keepalive enviado (URL: {PING_URL}) - {datetime.now().strftime('%H:%M:%S')}")
         except Exception as e:
             print(f"⚠️ Keepalive falhou: {e}")
-        time.sleep(PING_INTERVAL)
+        
+        # Ping a cada 45 segundos para ser mais agressivo contra o sleep do Render
+        time.sleep(45)
 
 ping_thread = threading.Thread(target=run_ping_loop, daemon=True)
 ping_thread.start()
@@ -1569,8 +1582,11 @@ def home():
     status_discord = "Conectado" if bot.is_ready() else "Desconectado"
     return f"🤖 G7 STORE - Bot está online! <br> Status Discord: {status_discord}", 200
 
-@app.route("/webhook", methods=["POST"])
+@app.route("/webhook", methods=["GET", "POST"])
 def webhook():
+    if request.method == "GET":
+        return "✅ Webhook endpoint is active and reachable!", 200
+        
     start_time = time.time()
     print("\n" + "⚡" * 20)
     print(f"WEBHOOK RECEBIDO ÀS {datetime.now().strftime('%H:%M:%S')}")
