@@ -1752,13 +1752,22 @@ def run_flask():
 
 def start_bot_with_auto_restart():
     """Inicia o bot com reconexão automática se cair"""
+    if not DISCORD_TOKEN:
+        print("❌ ERRO CRÍTICO: DISCORD_TOKEN não encontrado nas variáveis de ambiente!")
+        print("⚠️ O bot do Discord NÃO irá iniciar.")
+        return
+
     while True:
         try:
+            print("🚀 Tentando conectar ao Discord...")
             bot.run(DISCORD_TOKEN)
+        except discord.errors.LoginFailure:
+            print("❌ ERRO DE LOGIN: O DISCORD_TOKEN fornecido é inválido!")
+            break
         except Exception as e:
-            print(f"❌ Bot caiu com erro: {e}")
-            print("🔄 Tentando reconectar em 5 segundos...")
-            time.sleep(5)
+            print(f"❌ Bot caiu com erro inesperado: {e}")
+            print("🔄 Tentando reconectar em 10 segundos...")
+            time.sleep(10)
 
 def iniciar_servico():
     """Função principal: sobe Flask + bot Discord"""
