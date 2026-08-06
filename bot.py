@@ -157,7 +157,9 @@ def criar_pagamento_pix_com_preco(user_id, produto_id, preco, nome_produto):
         # 1. Validação e formatação do preço (deve ser float com 2 casas)
         preco_formatado = round(float(preco), 2)
         
-        # 2. Preparação dos dados (Adicionando campos de identificação que o MP exige em algumas contas)
+        # 2. Preparação dos dados
+        # NOTA: Para PIX, NÃO usamos 'installments' (PIX não suporta parcelas)
+        # NOTA: notification_url está deprecated no SDK v3 - configure via painel MP
         payment_data = {
             "transaction_amount": preco_formatado,
             "description": f"Compra: {nome_produto}"[:60],
@@ -167,18 +169,17 @@ def criar_pagamento_pix_com_preco(user_id, produto_id, preco, nome_produto):
                 "first_name": "Cliente",
                 "last_name": str(user_id)
             },
-            "external_reference": f"{produto_id}_{user_id}_{int(time.time())}",
-            "installments": 1
+            "external_reference": f"{produto_id}_{user_id}_{int(time.time())}"
         }
-
-        # Só adiciona notification_url se ela começar com https (exigência do MP)
-        if WEBHOOK_URL and WEBHOOK_URL.startswith("https"):
-            payment_data["notification_url"] = WEBHOOK_URL
 
         print(f"🔍 Tentando gerar PIX de R$ {preco_formatado} para o produto {produto_id}...")
         
-        # 3. Chamada à API
-        result = sdk.payment().create(payment_data)
+        # 3. Chamada à API com idempotency key (OBRIGATÓRIA para evitar duplicações)
+        request_options = mercadopago.config.RequestOptions()
+        request_options.custom_headers = {
+            'x-idempotency-key': f"g7pix-{produto_id}-{user_id}-{int(time.time())}"
+        }
+        result = sdk.payment().create(payment_data, request_options)
         
         # 4. Análise do Resultado
         status_code = result.get("status")
@@ -577,7 +578,13 @@ class VariacoesView(discord.ui.View):
             )
             
             if not pix_data:
-                await interaction.followup.send("❌ Erro ao gerar pagamento.", ephemeral=True)
+                await interaction.followup.send("❌ Erro ao gerar pagamento. Tente novamente ou entre em contato com o suporte.", ephemeral=True)
+                return
+            
+            # Verificar se o QR code foi gerado corretamente
+            if not pix_data.get("qr_code") or not pix_data.get("qr_code_base64"):
+                print(f"⚠️ QR Code não gerado. Dados: {pix_data}")
+                await interaction.followup.send("❌ Erro ao gerar o código PIX. Tente novamente ou entre em contato com o suporte.", ephemeral=True)
                 return
             
             await log_carrinho_ativo(
@@ -603,7 +610,14 @@ class VariacoesView(discord.ui.View):
             
             embed_pix.set_footer(text="Você receberá o produto aqui assim que o pagamento for confirmado!")
             
-            qr_image_data = base64.b64decode(pix_data["qr_code_base64"])
+            try:
+                qr_image_data = base64.b64decode(pix_data["qr_code_base64"])
+            except Exception as e:
+                print(f"❌ Erro ao decodificar QR code base64: {e}")
+                await user.send(embed=embed_pix, content=f"**Código PIX:**\n```{pix_data['qr_code']}```")
+                await interaction.followup.send("📨 Informações enviadas no seu privado!", ephemeral=True)
+                return
+            
             copiar_view = CopiarPIXView(pix_data["qr_code"])
             
             with BytesIO(qr_image_data) as image_binary:
@@ -1026,7 +1040,13 @@ class ProdutoCompraView(discord.ui.View):
             pix_data = criar_pagamento_pix_com_preco(user.id, self.produto_id, produto_info["preco"], self.produto_nome)
             
             if not pix_data:
-                await interaction.followup.send("❌ Erro ao gerar pagamento.", ephemeral=True)
+                await interaction.followup.send("❌ Erro ao gerar pagamento. Tente novamente ou entre em contato com o suporte.", ephemeral=True)
+                return
+            
+            # Verificar se o QR code foi gerado corretamente
+            if not pix_data.get("qr_code") or not pix_data.get("qr_code_base64"):
+                print(f"⚠️ QR Code não gerado. Dados: {pix_data}")
+                await interaction.followup.send("❌ Erro ao gerar o código PIX. Tente novamente ou entre em contato com o suporte.", ephemeral=True)
                 return
             
             await log_carrinho_ativo(
@@ -1052,7 +1072,14 @@ class ProdutoCompraView(discord.ui.View):
             
             embed_pix.set_footer(text="Você receberá o produto aqui assim que o pagamento for confirmado!")
             
-            qr_image_data = base64.b64decode(pix_data["qr_code_base64"])
+            try:
+                qr_image_data = base64.b64decode(pix_data["qr_code_base64"])
+            except Exception as e:
+                print(f"❌ Erro ao decodificar QR code base64: {e}")
+                await user.send(embed=embed_pix, content=f"**Código PIX:**\n```{pix_data['qr_code']}```")
+                await interaction.followup.send("📨 Informações enviadas no seu privado!", ephemeral=True)
+                return
+            
             copiar_view = CopiarPIXView(pix_data["qr_code"])
             
             with BytesIO(qr_image_data) as image_binary:
@@ -1622,6 +1649,10 @@ def webhook():
     if not payment_id:
         payment_id = request.args.get('id') or request.args.get('data.id')
     
+    # Garantir que payment_id é string (MP pode enviar como int)
+    if payment_id is not None:
+        payment_id = str(payment_id)
+    
     if not payment_id:
         print("⚠️ Webhook recebido, mas nenhum ID de pagamento encontrado. Pode ser um teste do MP.")
         return "OK", 200
@@ -1638,11 +1669,19 @@ def webhook():
             payment_response = sdk.payment().get(payment_id)
             print(f"📦 Resposta do MP: status={payment_response.get('status')}")
             
-            if payment_response["status"] == 200:
-                payment = payment_response["response"]
+            # Verificar se a resposta é válida (pode ser 200, 201, ou diretamente o payment dict)
+            payment = None
+            if isinstance(payment_response, dict):
+                if payment_response.get("status") in [200, 201]:
+                    payment = payment_response.get("response")
+                elif "id" in payment_response:
+                    # Caso o SDK retorne diretamente o objeto de pagamento
+                    payment = payment_response
+            
+            if payment:
                 print(f"✅ Status do pagamento: {payment.get('status')}")
                 
-                if payment["status"] == "approved":
+                if payment.get("status") == "approved":
                     print("🎉 PAGAMENTO APROVADO!")
                     
                     pagamentos_processados.add(str(payment_id))
@@ -1655,23 +1694,52 @@ def webhook():
                     if ref:
                         # Melhoria no parsing: O external_reference é gerado como: {produto_id}_{user_id}_{timestamp}
                         # Ou para variações: {produto_id}_{variacao}_{user_id}_{timestamp}
+                        # Como produto_id e variacao PODEM conter underscores, usamos a lógica:
+                        # O último é sempre o timestamp (número), o penúltimo é sempre o user_id (número)
+                        # Tudo antes desses dois é o produto_id (e possivelmente a variacao)
+                        # Formato com variacao: {produto_id}_{variacao_nome}_{user_id}_{timestamp}
+                        # Formato sem variacao: {produto_id}_{user_id}_{timestamp}
+                        
                         partes = ref.split('_')
                         print(f"🧩 Partes da referência: {partes}")
                         
                         if len(partes) >= 3:
-                            # O último é sempre o timestamp, o penúltimo é sempre o user_id
-                            user_id = int(partes[-2])
-                            timestamp = partes[-1]
+                            # O último é sempre o timestamp, o penúltimo é sempre o user_id (número)
+                            try:
+                                user_id = int(partes[-2])
+                            except ValueError:
+                                print(f"❌ Erro ao parsear user_id de: {partes[-2]}")
+                                print("⚠️ Referência inválida, pulando...")
+                                print(f"⚠️ Referência inválida: {ref}")
+                                return "OK", 200
                             
-                            # O que sobrar no início é o produto e a variação
-                            # Se tiver 3 partes: [produto, user_id, timestamp]
-                            # Se tiver 4 partes: [produto, variacao, user_id, timestamp]
+                            # Tentativa de identificar se há variação:
+                            # Formato: produto_id_variacao_userID_timestamp (4+ partes)
+                            # Formato: produto_id_userID_timestamp (3 partes)
+                            
                             if len(partes) == 3:
+                                # Sem variação: [produto_id, user_id, timestamp]
                                 produto_id = partes[0]
                                 variacao_nome = None
                             else:
-                                produto_id = partes[0]
-                                variacao_nome = partes[1]
+                                # Com variação ou produto_id com underscores
+                                # Precisamos verificar qual parte é o produto_id existente
+                                # Estratégia: tentar concatenar do início até encontrar um produto_id válido
+                                found_product = False
+                                for i in range(1, len(partes) - 2):
+                                    candidate = '_'.join(partes[:i])
+                                    if candidate in produtos_disponiveis:
+                                        produto_id = candidate
+                                        # O que está entre produto_id e user_id é a variação
+                                        variacao_nome = '_'.join(partes[i:-2])
+                                        found_product = True
+                                        break
+                                
+                                if not found_product:
+                                    # Fallback: assumir que o primeiro underscore separa produto da variação
+                                    # Isso funciona se produto_id não tem underscores
+                                    produto_id = partes[0]
+                                    variacao_nome = '_'.join(partes[1:-2])
                             
                             print(f"📦 Produto ID: {produto_id}")
                             print(f"👤 User ID: {user_id}")
@@ -1692,6 +1760,17 @@ def webhook():
                                 print(f"📦 Produto: {produto_info['nome']} - Tipo: {produto_info.get('tipo')}")
                                 
                                 if produto_info.get("tipo") == "auto":
+                                    # Se há variação, procurar a variação correta no produto
+                                    if variacao_nome:
+                                        variacoes_config = produto_info.get("variacoes", [])
+                                        matched_variacao = None
+                                        for v in variacoes_config:
+                                            if v.get("nome") == variacao_nome or variacao_nome in v.get("nome", ""):
+                                                matched_variacao = v.get("nome")
+                                                break
+                                        if matched_variacao:
+                                            variacao_nome = matched_variacao
+                                    
                                     item = entregar_do_estoque(produto_id, variacao_nome=variacao_nome)
                                     
                                     if item:
@@ -1750,7 +1829,7 @@ def webhook():
                     else:
                         print(f"⚠️ Nenhuma referência externa encontrada")
                 else:
-                    print(f"⚠️ Pagamento não aprovado. Status: {payment['status']}")
+                    print(f"⚠️ Pagamento não aprovado. Status: {payment.get('status')}")
             else:
                 print(f"❌ Erro ao buscar pagamento: {payment_response}")
         except Exception as e:
