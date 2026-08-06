@@ -1,8 +1,7 @@
-discord.py
-mercadopago
-flask
-Pillow
-requests
-gunicorn
-pyotp
-eventlet
+discord.py>=2.3.0
+mercadopago>=2.0.0
+flask>=3.0.0
+Pillow>=10.0.0
+requests>=2.31.0
+gunicorn>=21.2.0
+pyotp>=2.9.0
